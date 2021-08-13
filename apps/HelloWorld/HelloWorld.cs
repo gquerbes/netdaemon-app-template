@@ -1,5 +1,6 @@
 using System;
 using System.Reactive.Linq;
+using daemonapp;
 using NetDaemon.Common.Reactive;
 
 // Use unique namespaces for your apps if you going to share with others to avoid
@@ -11,10 +12,12 @@ namespace HelloWorld
     /// </summary>
     public class HelloWorldApp : NetDaemonRxApp
     {
-        private string HeldDirectionalButton = "";
-        private string HeldBrightnessButton = "";
+
+        TradfriRemote remote;
         public override void Initialize()
         {
+            RegisterToControlEvents();
+            
             //subscribe for ikea button events
             EventChanges
                 //listen for all zigbee home automation events (zhe_event)
@@ -22,159 +25,54 @@ namespace HelloWorld
                 .Subscribe(s =>
                {
 
-                   if (s?.Data == null)
-                       return;
-                   double args = 0;
-                   string command = "";
-
-                   try
-                   {
-                       args = s.Data["args"][0];
-                   }
-                   catch { /*do nothing and continue*/};
-
-
-                   try
-                   {
-                        command = s.Data["command"];
-                   }
-                   catch
-                   {
-                       //there was no command. (likely device went to sleep)
-                       return;
-                   }
-
-                   //get command from event
-                   switch (command)
-                   {
-                       //press of left or right button
-                       case "press":
-                           HandlePressEvents(args);
-                           break;
-                       //hold of a directional button
-                       case "hold":
-                           HandleHoldEvent(args);
-                           break;
-                       //release of left or right button
-                       case "release":
-                           HandleReleaseEvents(args);
-                           break;
-                       //press brightness Down
-                       case "step":
-                           OnDownButtonPressed();
-                           break;
-                       //press brightness up
-                       case "step_with_on_off":
-                           OnUpButtonPressed();
-                           break;
-                       //hold brightness down
-                       case "move":
-                           HeldBrightnessButton = "DOWN";
-                           OnUpButtonHold();
-                           break;
-                       // hold brightness down
-                       case "move_with_on_off":
-                           HeldBrightnessButton = "UP";
-                           OnDownButtonHold();
-                           break;
-                       // release of brightness buttons
-                       case "stop":
-                           HandleStopEvents(args);
-                           break;
-                       case "toggle"://power button
-                           OnPowerButtonPressed();
-                           break;
-                   }
+                   remote.ProcessCommand(s);
 
                });
 
 
-            //print out all events
-            EventChanges
-                .Subscribe(s => 
-                {
-                    System.Diagnostics.Debug.WriteLine($"Event = {s.Event}\n Data = {s.Data}\nDomain = {s.Domain}\n");
-                });
+     
 
         }
 
-        /// <summary>
-        /// Handle releasing of directional button
-        /// </summary>
-        private void HandleReleaseEvents(double timeHeld)
+        private void RegisterToControlEvents()
         {
-            if (HeldDirectionalButton == "LEFT")
-            {
-                OnLeftButtonReleased();
-            }
-            else if (HeldDirectionalButton == "RIGHT")
-            {
-                OnRightButtonReleaed();
-            }
+            remote = new TradfriRemote();
+            remote.OnLeftButtonPressed += OnLeftButtonPressed;
+            remote.OnRightButtonPressed+= OnRightButtonPressed;
+            remote.OnUpButtonPressed += OnUpButtonPressed;
+            remote.OnDownButtonPressed += OnDownButtonPressed;
+            remote.OnCenterButtonPressed += OnCenterButtonPressed;
 
-            System.Diagnostics.Debug.WriteLine($"*Time {timeHeld}");
-        }
 
-        /// <summary>
-        /// Handle release of brightness button
-        /// </summary>
-        private void HandleStopEvents(double timeHeld)
-        {
-            if (HeldBrightnessButton == "UP")
-            {
-                OnUpButtonReleased();
-            }
-            else if (HeldBrightnessButton == "DOWN")
-            {
-                OnDownButtonReleased();
-            }
-            System.Diagnostics.Debug.WriteLine($"*Time {timeHeld}");
+            remote.OnLeftButtonHeld += OnLeftButtonHold;
+            remote.OnRightButtonHeld += OnRightButtonHold;
+            remote.OnUpButtonHeld += OnUpButtonHold;
+            remote.OnDownButtonHeld += OnDownButtonHold;
+            remote.OnCenterHeld += OnCenterButtonHold;
+
+            remote.OnLeftButtonReleased += OnLeftButtonReleased;
+            remote.OnRightButtonReleased += OnRightButtonReleased;
+            remote.OnUpButtonReleased += OnUpButtonReleased;
+            remote.OnDownButtonReleased += OnDownButtonReleased;
 
         }
 
-        private void HandlePressEvents(double deviceId)
-        {
-            switch (deviceId)
-            {
-                case 256://right button tap
-                    OnRightButtonPressed();
-                    break;
-                case 257://left button tap
-                    OnLeftButtonPressed();
-                    break;
-            };
-        }
-
-        private void HandleHoldEvent(double timeHeld)
-        {
-            switch (timeHeld)
-            {
-                case 3328://right button tap
-                    OnRightButtonHold();
-                    HeldDirectionalButton = "RIGHT";
-                    break;
-                case 3329://left button tap
-                    OnLeftButtonHold();
-                    HeldDirectionalButton = "LEFT";
-                    break;
-            };
-        }
+      
 
         private void OnLeftButtonPressed()
         {
-            Entity("switch.plug").Toggle();
             System.Diagnostics.Debug.WriteLine("on Left Button click");
 
         }
 
-        private void OnLeftButtonHold()
+        private void OnLeftButtonHold(double timeHeld)
         {
-            System.Diagnostics.Debug.WriteLine("Left Button hold");
+            System.Diagnostics.Debug.WriteLine($"Left Button hold {timeHeld}");
         }
 
-        private void OnLeftButtonReleased()
+        private void OnLeftButtonReleased(double timeHeld)
         {
-            System.Diagnostics.Debug.WriteLine("Left Button released");
+            System.Diagnostics.Debug.WriteLine($"Left Button released {timeHeld}");
         }
 
         private void OnRightButtonPressed()
@@ -182,72 +80,60 @@ namespace HelloWorld
             System.Diagnostics.Debug.WriteLine("Right Button Pressed");
         }
 
-        private void OnRightButtonHold()
+        private void OnRightButtonHold(double timeHeld)
         {
-            System.Diagnostics.Debug.WriteLine("Right Button hold");
+            System.Diagnostics.Debug.WriteLine($"Right Button hold {timeHeld}");
         }
 
-        private void OnRightButtonReleaed()
+        private void OnRightButtonReleased(double timeHeld)
         {
-            System.Diagnostics.Debug.WriteLine("Right Button released");
+            System.Diagnostics.Debug.WriteLine($"Right Button released {timeHeld}");
         }
 
         private void OnUpButtonPressed()
         {
             System.Diagnostics.Debug.WriteLine("Up Button Pressed");
-            Entity("switch.plug").Toggle();
 
         }
-        private void OnUpButtonHold()
+        private void OnUpButtonHold(double timeHeld)
         {
-            System.Diagnostics.Debug.WriteLine("Up Button hold");
+            System.Diagnostics.Debug.WriteLine($"Up Button hold {timeHeld}");
         }
 
-        private void OnUpButtonReleased()
+        private void OnUpButtonReleased(double timeHeld)
         {
-            System.Diagnostics.Debug.WriteLine("Up Button released");
+            System.Diagnostics.Debug.WriteLine($"Up Button released {timeHeld} ");
         }
 
-        private void OnDownButtonHold()
+        private void OnDownButtonHold(double timeHeld)
         {
-            System.Diagnostics.Debug.WriteLine("Down Button hold");
+            System.Diagnostics.Debug.WriteLine($"Down Button hold {timeHeld}");
         }
 
-        private void OnDownButtonReleased()
+        private void OnCenterButtonHold(double timeHeld)
         {
-            System.Diagnostics.Debug.WriteLine("Down Button released");
+            System.Diagnostics.Debug.WriteLine($"Down Button hold {timeHeld}");
+        }
+
+        private void OnDownButtonReleased(double timeHeld)
+        {
+            System.Diagnostics.Debug.WriteLine($"Down Button released {timeHeld}");
         }
 
 
         private void OnDownButtonPressed()
         {
             System.Diagnostics.Debug.WriteLine("Down Button Pressed");
-            CallService("media_player", "media_play_pause", new { entity_id = "media_player.living_room_apple_tv" });
-
-
 
         }
 
-        private void OnPowerButtonPressed()
+        private void OnCenterButtonPressed()
         {
-            System.Diagnostics.Debug.WriteLine("Power Button Pressed");
-            NotifyMe();
-            CallService("light", "toggle", 
-                new { entity_id = "light.sengled_e11_n1ea_b24c0700_level_light_color_on_off" ,
-                    color_name ="red",
-                    brightness = "255",
-                    effect = "random"});
+            System.Diagnostics.Debug.WriteLine("Center Button Pressed");
+          
         }
 
-        private void NotifyMe()
-        {
-            CallService("notify", "notify",
-                new {
-                    title = "Hello Gabriel",
-                    message = "This is a message"
-                });
-        }
-
+     
 
     }
 }
